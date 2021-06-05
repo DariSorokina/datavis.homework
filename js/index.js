@@ -75,18 +75,155 @@ loadData().then(data => {
         param = d3.select(this).property('value');
         updateBar();
     });
+    
+    d3.select('#p').on('change', function(){ 
+        lineParam = d3.select(this).property('value');
+        updateLineChart();
+    });
+
 
     function updateBar(){
+
+        var regions = d3.map(data, function (d) {return d['region'];}).keys();
+        var values = regions.map(function(r) {return d3.mean(data.filter(function(d) {return d.region == r})
+        .flatMap(function(d) {return d[param][year]}))});
+
+        var bardata = [];
+        regions.forEach(function (r, index){bardata.push({'keyR': r, 'keyAvg': values[index]}); return;})
+
+
+        const xBar = d3.scaleBand().range([margin*2, barWidth-margin]).padding(0.1).domain(regions);
+        const yBar = d3.scaleLinear().range([height-margin, margin]).domain([d3.min(values), d3.max(values)])
+
+        xBarAxis.call(d3.axisBottom().scale(xBar));
+        yBarAxis.call(d3.axisLeft().scale(yBar));
+
+
+        barChart.selectAll('rect').remove();
+
+
+
+        barChart.append("g").selectAll("rect").data(bardata)
+        .enter().append("rect")
+        .attr('x', function(d){return xBar(d.keyR)})
+        .attr('y', function(d){return yBar(d.keyAvg)-30})
+        .attr('fill', function(d){return colorScale(d.keyR)})
+        .attr('height', function(d){return 500-yBar(d.keyAvg)})
+        .attr('width', '90')
+        .attr('reg', function(d){return d.keyR})
+        .on('click', function(d){barChart.selectAll('rect')
+        .style('opacity', '0.5'); d3.select(this).style('opacity', '1');
+        updateScattePlot(reg = d3.select(this).attr('reg'))})
+
+
+
+        console.log()
+        console.log(values)
+        console.log(data)
+
+
+
+
+
         return;
     }
 
-    function updateScattePlot(){
+    function updateScattePlot(reg = ''){
+        scatterPlot.selectAll('circle').remove()
+
+
+
+        var x = d3.scaleLinear().range([margin*2, width-margin]).domain([d3.min(data, function(d){return +d[xParam][year]}), d3.max(data, function(d){return +d[xParam][year]})]);
+        var y = d3.scaleLinear().range([height-margin, margin]).domain([d3.min(data, function(d){return +d[yParam][year]}), d3.max(data, function(d){return +d[yParam][year]})]);
+
+        xAxis.call(d3.axisBottom().scale(x));
+        yAxis.call(d3.axisLeft().scale(y));
+
+        const radiusScale = d3.scaleSqrt().range([10, 30]).domain([d3.min(data, function(d){return +d[rParam][year]}), d3.max(data, function(d){return +d[rParam][year]})]);
+
+
+        
+
+
+
+        scatterPlot.append("g").selectAll("circle").data(data)
+        .enter().append("circle").attr('r', function(d){return radiusScale(d[rParam][year])})
+        .attr('cx', function(d){return x(d[xParam][year])})
+        .attr('cy', function(d){return y(d[yParam][year])})
+        .attr('fill', function(d){return colorScale(d.region)})
+        .attr('country', function(d){return d.country})
+        .on('click', function(d){selected = d3.select(this).attr('country'); countryName.html(selected); updateLineChart();
+        scatterPlot.selectAll('circle').style('opacity', '0.65'); 
+        scatterPlot.append('circle').attr('r', d3.select(this).attr('r'))
+        .attr('cx', d3.select(this).attr('cx'))
+        .attr('cy', d3.select(this).attr('cy'))
+        .attr('fill', d3.select(this).attr('fill'))
+        .style('opacity', '1')
+    });
+
+        if (reg != ''){scatterPlot.selectAll('circle')
+        .filter(d => d.region != reg).style('visibility', 'hidden')};
+
+
+
         return;
     }
 
-    updateBar();
-    updateScattePlot();
-});
+
+        function updateLineChart(){
+        lineChart.selectAll('path').remove()
+
+        if (selected != '' ){var country = data.filter(function(c){return c.country == selected})
+        .map(function(c) {return Object.values(c[lineParam])});
+
+
+        
+        var linedata = [];
+        var year = d3.range(1800,2021).map(function(y){return new Date(y,0)});
+        console.log(year);
+        
+
+        year.forEach(function (y, index) {linedata.push({'keyY': y, 'keyV': Number(country[0][index])})});
+
+
+        var x = d3.scaleTime().domain([d3.min(linedata, function (d){return +d.keyY}), d3.max(linedata, function (d){return +d.keyY}) ])
+        .range([margin*2, width-margin]);
+
+        var y = d3.scaleLinear()
+        .domain([d3.min(linedata, function (d){return +d.keyV}), d3.max(linedata, function (d){return +d.keyV}) ])
+        .range([height-margin, margin]);
+
+
+        xLineAxis.call(d3.axisBottom().tickFormat(d3.timeFormat("%Y")).scale(x)) 
+        yLineAxis.call(d3.axisLeft().scale(y)) 
+
+
+        lineChart.append('g')
+        .append('path')
+        .datum(linedata)
+        .attr('stroke', 'blue')
+        .attr('stroke-width', 1.5)
+        .style('fill', 'none')
+        .attr('d', d3.line()
+        .x(d => x(d.keyY))
+        .y(d => y(d.keyV)))
+
+
+        }
+       
+        return;
+    }
+
+
+            updateBar();
+            updateScattePlot();
+        });
+
+
+
+
+
+
 
 
 async function loadData() {
